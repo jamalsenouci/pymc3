@@ -36,7 +36,7 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
         Display helpful warnings, and verbose output of `fmin` (Defaults to
         `False`)
     use_fprime : Bool
-        Use theano-generated gradient if optimizer supports gradients 
+        Use theano-generated gradient if optimizer supports gradients
         (Defaults to `True`).
     model : Model (optional if in `with` context)
     *args, **kwargs
@@ -58,13 +58,13 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
               "parameters. Defaulting to non-gradient minimization " +
               "fmin_powell.")
 
+    allinmodel(vars, model)
+
     if fmin is None:
         if disc_vars:
             fmin = optimize.fmin_powell
         else:
             fmin = optimize.fmin_bfgs
-
-    allinmodel(vars, model)
 
     start = Point(start, model=model)
     bij = DictToArrayBijection(ArrayOrdering(vars), start)
@@ -81,6 +81,16 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
     # Check to see if minimization function actually uses the gradient
     if use_fprime and getargspec(fmin).args:
         fprime = kwargs.pop('fprime', grad_logp_o)
+
+        # Check the gradient:
+        grad_error = optimize.check_grad(logp_o, fprime, bij.map(start))
+        if grad_error > 1E-4:
+            print("Warning: Large discrepancy between analytic and "
+                  "numeric gradient: %f." % grad_error +
+                  " Optimizer may not converge. Try running with "
+                  "`use_fprime=False` to use numerical gradient if "
+                  "convergence fails.")
+
         r = fmin(logp_o, bij.map(start), fprime=fprime, disp=disp,
                  *args, **kwargs)
     else:
@@ -94,14 +104,14 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
     mx = bij.rmap(mx0)
 
     if (not allfinite(mx0) or
-        not allfinite(model.logp(mx)) or
-        not allfinite(model.dlogp()(mx))):
+            not allfinite(model.logp(mx)) or
+            not allfinite(model.dlogp()(mx))):
 
 
         messages = []
         for var in vars:
 
-            vals = { 
+            vals = {
                 "value"   : mx[var.name],
                 "logp"    : var.logp(mx),
                 "dlogp"   : var.dlogp()(mx) }
@@ -113,7 +123,7 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
                     idx = np.nonzero(logical_not(isfinite(values)))
                     return name + " bad at idx: " + str(idx) + " with values: " + str(values[idx])
 
-            messages += [ 
+            messages += [
                 message(var.name + "." + k, v)
                 for k,v in vals.items()
                 if not allfinite(v)]
@@ -127,7 +137,7 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
                          "1) you don't have hierarchical parameters, " +
                          "these will lead to points with infinite " +
                          "density. 2) your distribution logp's are " +
-                         "properly specified. Specific issues: \n" + 
+                         "properly specified. Specific issues: \n" +
                          specific_errors)
     mx = {v.name: mx[v.name].astype(v.dtype) for v in model.vars}
 
