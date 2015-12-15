@@ -15,7 +15,7 @@ __all__ = ['find_MAP', 'scipyminimize']
 
 
 def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
-             disp=False, model=None, *args, **kwargs):
+             disp=False, use_fprime=True, model=None, *args, **kwargs):
     """
     Sets state to the local maximum a posteriori point given a model.
     Current default of fmin_Hessian does not deal well with optimizing close
@@ -35,6 +35,9 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
     disp : Bool
         Display helpful warnings, and verbose output of `fmin` (Defaults to
         `False`)
+    use_fprime : Bool
+        Use theano-generated gradient if optimizer supports gradients 
+        (Defaults to `True`).
     model : Model (optional if in `with` context)
     *args, **kwargs
         Extra args passed to fmin
@@ -76,9 +79,10 @@ def find_MAP(start=None, vars=None, fmin=None, return_raw=False,
         return nan_to_num(-dlogp(point))
 
     # Check to see if minimization function actually uses the gradient
-    if 'fprime' in getargspec(fmin).args:
-        r = fmin(logp_o, bij.map(
-            start), fprime=grad_logp_o, disp=disp, *args, **kwargs)
+    if use_fprime and getargspec(fmin).args:
+        fprime = kwargs.pop('fprime', grad_logp_o)
+        r = fmin(logp_o, bij.map(start), fprime=fprime, disp=disp,
+                 *args, **kwargs)
     else:
         r = fmin(logp_o, bij.map(start), disp=disp, *args, **kwargs)
 
@@ -142,7 +146,7 @@ def nan_to_high(x):
 
 
 def scipyminimize(f, x0, fprime, *args, **kwargs):
-    r = scipy.optimize.minimize(f, x0, jac=fprime, *args, **kwargs)
+    r = optimize.minimize(f, x0, jac=fprime, *args, **kwargs)
     return r.x, r
 
 
